@@ -3,53 +3,68 @@
 #include <string.h>
 #include <dirent.h>
 #include <ctype.h>
+#include <windows.h>  // Required to use GetModuleFileName
 
-/* Hi */
+void set_working_directory(const char* path) {
+    if (chdir(path) != 0) {
+        exit(EXIT_FAILURE);
+    }
+} 
+
+
+char* strndup(const char* s, size_t n) {
+    char* new = malloc(n+1);
+    if (new) {
+        strncpy(new, s, n);
+        new[n] = '\0';
+    }
+    return new;
+}
 
 typedef 
 	enum {
-		C_ZERO,
-		C_LIST,
+		C_ZERO, 
+		C_LIST = 1,
 		C_SHOW,
 		C_TEST,
+		C_ADD, // new variable
 		C_EXIT,
 	}
-	command_t ;
-
+	command_t;
 
 char * read_a_line (FILE * fp)
 {
 	static char buf[BUFSIZ] ;
-	static int buf_n = 0 ;
-	static int curr = 0 ;
+	static int buf_n = 0;
+	static int curr = 0;
 
-	if (feof(fp) && curr == buf_n - 1)
-		return 0x0 ;
-
-	char * s = 0x0 ;
-	size_t s_len = 0 ;
+	if (feof(fp) && curr == buf_n - 1) {
+		return 0;
+	}
+	char * s = 0;
+	size_t s_len = 0;
 	do {
-		int end = curr ;
+		int end = curr;
 		while (!(end >= buf_n || !iscntrl(buf[end]))) {
-			end++ ;
+			end++;
 		}
 		if (curr < end && s != 0x0) {
-			curr = end ;
-			break ;
+			curr = end;
+			break;
 		}
-		curr = end ;
+		curr = end;
 		while (!(end >= buf_n || iscntrl(buf[end]))) {
-			end++ ;
+			end++;
 		}
 		if (curr < end) {
 			if (s == 0x0) {
-				s = strndup(buf + curr, end - curr) ;
-				s_len = end - curr ;
+				s = strndup(buf + curr, end - curr);
+				s_len = end - curr;
 			}
 			else {
-				s = realloc(s, s_len + end - curr + 1) ;
-				s = strncat(s, buf + curr, end - curr) ;
-				s_len = s_len + end - curr ;
+				s = realloc(s, s_len + end - curr + 1);
+				s = strncat(s, buf + curr, end - curr);
+				s_len = s_len + end - curr;
 			}
 		}
 		if (end < buf_n) {
@@ -70,7 +85,8 @@ void print_menu() {
 	printf("1. List all wordbooks\n") ;
 	printf("2. Show the words in a wordbook\n") ;
 	printf("3. Test with a wordbook\n") ;
-	printf("4. Exit\n") ;
+	printf("4. Add more voca\n") ;
+	printf("5. Exit\n");
 }
 
 int get_command() {
@@ -83,18 +99,15 @@ int get_command() {
 
 void list_wordbooks ()
 {
-
-	DIR * d = opendir("wordbooks") ;
-	
+	DIR * d = opendir("wordbooks");
 	printf("\n  ----\n") ;
-
-	struct dirent * wb ;
+	struct dirent * wb;
 	while ((wb = readdir(d)) != NULL) {
 		if (strcmp(wb->d_name, ".") != 0 && strcmp(wb->d_name, "..") !=0) {
 			printf("  %s\n", wb->d_name) ;
 		}
 	}
-	closedir(d) ;
+	closedir(d);
 
 	printf("  ----\n") ;
 }
@@ -102,7 +115,7 @@ void list_wordbooks ()
 void show_words ()
 {
 	char wordbook[128] ;
-	char filepath[256] ;
+	char filepath[BUFSIZ] ;
 
 	list_wordbooks() ;
 
@@ -130,11 +143,10 @@ void show_words ()
 	fclose(fp) ;
 }
 
-
 void run_test ()
 {
 	char wordbook[128] ;
-	char filepath[256] ;
+	char filepath[BUFSIZ] ;
 
 	printf("Type in the name of the wordbook?\n") ;
 	printf(">") ;
@@ -181,12 +193,62 @@ void run_test ()
 }
 
 
+void add_voca() {
+    char wordbook[128];
+    char filepath[BUFSIZ];
+
+    list_wordbooks();
+
+    printf("Type in the name of the wordbook?\n");
+    printf(">");
+    scanf("%s", wordbook);
+
+    snprintf(filepath, sizeof(filepath), "wordbooks/%s", wordbook);
+
+    FILE* fp = fopen(filepath, "a");
+
+    char word[128];
+    char meaning[256];
+
+    printf("Type the new word:\n");
+    printf(">");
+    scanf("%s", word);
+    printf("Type the meaning of the word:\n");
+    printf(">");
+    getchar();
+    fgets(meaning, sizeof(meaning), stdin);
+    meaning[strcspn(meaning, "\n")] = 0;  
+	scanf("%s", meaning);
+
+    fprintf(fp, "\"%s\" : \"%s\"\n", word, meaning);
+
+    fclose(fp);
+
+    printf("New vocabulary added to %s\n", wordbook);
+}
+
+
+
+
 int main ()
 {
 	
 	printf(" *** Word Quiz *** \n\n") ;
 
-	int cmd ;
+	char exe_path[BUFSIZ];
+
+    if (GetModuleFileName(NULL, exe_path, BUFSIZ) == 0) { // A function that finds the current executing directory location
+        return 1;
+    }
+
+    char* last_slash = strrchr(exe_path, '\\');
+    if (last_slash != NULL) {
+        *last_slash = '\0';
+        set_working_directory(exe_path);
+    }
+
+
+	int cmd;
 	do {
 		print_menu() ;
 
@@ -206,14 +268,20 @@ int main ()
 				run_test() ;
 				break ;
 			}
+			case C_ADD: {
+				add_voca();
+				break;
+			}
 
 			case C_EXIT: {
 				return EXIT_SUCCESS ;
 			}
+			default: {
+				printf("Invalid input. The range of numbers is 1 to 5. 5 is to exit.\n");
+			}
 		}
 	}
 	while (cmd != C_EXIT) ;
-
 
 	return EXIT_SUCCESS ;
 }
