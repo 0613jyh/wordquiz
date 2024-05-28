@@ -11,6 +11,6 @@ guided by **Professor** [Shin Hong][1] of the Dept. of Computer Science at Chung
 
 
 
-[1] https://github.com/hongshin/wordquiz
+[1]: https://github.com/hongshin/wordquiz
 
 
